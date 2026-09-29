@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>俄语单词手写背记</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #f2f4f8; color: #222; padding: 16px;
+    max-width: 560px; margin: 0 auto;
+  }
+  h1 { font-size: 20px; text-align: center; margin: 8px 0 14px; }
+
+  .tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+  .tab {
+    flex: 1; text-align: center; padding: 10px; border-radius: 10px;
+    background: #e8edf4; font-size: 15px; font-weight: 600; cursor: pointer;
+  }
+  .tab.active { background: #3b82f6; color: #fff; }
+
+  .card {
+    background: #fff; border-radius: 16px; padding: 18px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06); margin-bottom: 14px;
+  }
+
+  .cats { display: flex; flex-wrap: wrap; gap: 8px; }
+  .cat {
+    padding: 8px 14px; border-radius: 20px; border: 1px solid #cdd6e0;
+    background: #fff; font-size: 14px; cursor: pointer;
+  }
+  .cat.active { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+  .cat .num { opacity: 0.7; font-size: 12px; margin-left: 4px; }
+
+  .bar-wrap { margin-top: 12px; }
+  .bar-bg { height: 8px; background: #e5eaf1; border-radius: 4px; overflow: hidden; }
+  .bar-fill { height: 100%; background: #22c55e; width: 0; transition: width .3s; }
+  .bar-text { font-size: 12px; color: #666; margin-top: 6px; text-align: right; }
+
+  .prompt { text-align: center; font-size: 30px; font-weight: 700; margin: 10px 0 4px; }
+  .hint { text-align: center; color: #888; font-size: 13px; margin-bottom: 12px; }
+  canvas {
+    width: 100%; height: 200px; background: #fafbfc;
+    border: 2px dashed #b9c4d0; border-radius: 12px;
+    touch-action: none; display: block;
+  }
+  .btns { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+  button {
+    flex: 1; min-width: 90px; padding: 12px; border: none;
+    border-radius: 10px; font-size: 15px; font-weight: 600;
+    cursor: pointer; background: #e8edf4; color: #333;
+  }
+  button.primary { background: #3b82f6; color: #fff; }
+  button.good { background: #22c55e; color: #fff; }
+  button.bad { background: #ef4444; color: #fff; }
+  button:active { opacity: 0.8; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .answer {
+    text-align: center; font-size: 28px; font-weight: 700;
+    color: #3b82f6; margin: 14px 0 4px; min-height: 36px; letter-spacing: 1px;
+  }
+  .stats { text-align: center; color: #666; font-size: 14px; }
+  .hidden { display: none; }
+
+  .word-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 4px; border-bottom: 1px solid #eef1f5; font-size: 15px;
+  }
+  .word-row:last-child { border-bottom: none; }
+  .word-zh { color: #333; }
+  .word-ru { color: #3b82f6; font-weight: 600; }
+  .cat-title { font-size: 15px; font-weight: 700; margin: 14px 0 6px; color: #555; }
+  .total-box { text-align: center; padding: 10px; font-size: 15px; color: #333; }
+  .total-box b { color: #3b82f6; font-size: 20px; }
+
+  textarea {
+    width: 100%; height: 160px; padding: 12px; border-radius: 10px;
+    border: 1px solid #cdd6e0; font-size: 14px; font-family: inherit;
+    resize: vertical; line-height: 1.6;
+  }
+  .import-tip { font-size: 13px; color: #888; line-height: 1.7; margin-bottom: 10px; }
+  .import-tip code {
+    background: #eef1f5; padding: 1px 5px; border-radius: 4px; font-size: 12px;
+  }
+  .cat-list-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 4px; border-bottom: 1px solid #eef1f5; font-size: 15px;
+  }
+  .cat-list-item:last-child { border-bottom: none; }
+  .del-btn {
+    flex: none; min-width: auto; padding: 6px 12px; font-size: 13px;
+    background: #fee2e2; color: #ef4444; font-weight: 600;
+  }
+  .toast {
+    position: fixed; left: 50%; bottom: 30px; transform: translateX(-50%);
+    background: #222; color: #fff; padding: 10px 20px; border-radius: 20px;
+    font-size: 14px; opacity: 0; transition: opacity .3s; pointer-events: none;
+    z-index: 99;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<h1>俄语单词手写背记</h1>
+
+<div class="tabs">
+  <div class="tab active" id="tabStudy" onclick="switchTab('study')">背记</div>
+  <div class="tab" id="tabList" onclick="switchTab('list')">词库</div>
+  <div class="tab" id="tabImport" onclick="switchTab('import')">导入/备份</div>
+</div>
+
+<!-- ========== 背记页 ========== -->
+<div id="studyView">
+  <div class="card">
+    <div class="cats" id="cats"></div>
+    <div class="bar-wrap">
+      <div class="bar-bg"><div class="bar-fill" id="barFill"></div></div>
+      <div class="bar-text" id="barText"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="prompt" id="prompt">—</div>
+    <div class="hint" id="hint">在下面手写对应的俄语单词</div>
+    <canvas id="pad"></canvas>
+    <div class="answer" id="answer"></div>
+    <div class="btns">
+      <button onclick="clearPad()">清空</button>
+      <button onclick="speakWord()">🔊 朗读</button>
+      <button class="primary" onclick="showAnswer()">显示答案</button>
+    </div>
+    <div class="btns">
+      <button class="bad" onclick="mark(false)">陌生</button>
+      <button class="good" onclick="mark(true)">认识</button>
+    </div>
+  </div>
+
+  <div class="card stats" id="stats">本次：认识 0 · 陌生 0</div>
+</div>
+
+<!-- ========== 词库页 ========== -->
+<div id="listView" class="hidden">
+  <div class="card total-box" id="totalBox"></div>
+  <div class="card">
+    <input type="text" id="searchBox" placeholder="搜索中文或俄语..."
+      oninput="renderList()"
+      style="width:100%;padding:12px;border-radius:10px;border:1px solid #cdd6e0;font-size:15px;">
+  </div>
+  <div class="card" id="wordList"></div>
+</div>
+
+<!-- ========== 导入/备份页 ========== -->
+<div id="importView" class="hidden">
+  <div class="card">
+    <div class="import-tip">
+      <b>格式：</b>每行一个单词，中文和俄语用空格、逗号或制表符分隔。<br>
+      例：<code>猫 кошка</code> 或 <code>猫,кошка</code><br>
+      分类名填在下面，同名分类会合并。
+    </div>
+    <input type="text" id="importCat" placeholder="分类名，例如：我的单词"
+      style="width:100%;padding:12px;border-radius:10px;border:1px solid #cdd6e0;font-size:15px;margin-bottom:10px;">
+    <textarea id="importText" placeholder="猫 кошка&#10;狗 собака&#10;鸟 птица"></textarea>
+    <div class="btns">
+      <button class="primary" onclick="doImport()">导入</button>
+      <button onclick="loadExample()">填入示例</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="cat-title">备份与恢复</div>
+    <div class="import-tip">
+      导出会保存<b>全部词库 + 学习进度</b>为一个 JSON 文件。<br>
+      恢复时可选择<b>覆盖</b>（清空现有数据）或<b>合并</b>（保留现有，追加备份里的新词）。
+    </div>
+    <div class="btns">
+      <button class="primary" onclick="exportBackup()">⬇️ 导出备份</button>
+      <button onclick="document.getElementById('restoreFile').click()">⬆️ 恢复备份</button>
+    </div>
+    <input type="file" id="restoreFile" accept=".json,application/json"
+      style="display:none" onchange="restoreBackup(event)">
+  </div>
+
+  <div class="card">
+    <div class="cat-title">已有分类</div>
+    <div id="catManageList"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   内置词库
+   ============================================================ */
+const DEFAULT_WORDS = {
+  "动物": [
+    { zh: "猫", ru: "кошка" }, { zh: "狗", ru: "собака" },
+    { zh: "鸟", ru: "птица" }, { zh: "鱼", ru: "рыба" },
+    { zh: "马", ru: "лошадь" }, { zh: "牛", ru: "корова" },
+    { zh: "猪", ru: "свинья" }, { zh: "羊", ru: "овца" },
+    { zh: "鸡", ru: "курица" }, { zh: "熊", ru: "медведь" },
+    { zh: "狼", ru: "волк" }, { zh: "狐狸", ru: "лиса" },
+    { zh: "兔子", ru: "заяц" }, { zh: "老鼠", ru: "мышь" },
+    { zh: "大象", ru: "слон" }, { zh: "老虎", ru: "тигр" }
+  ],
+  "食物": [
+    { zh: "面包", ru: "хлеб" }, { zh: "水", ru: "вода" },
+    { zh: "牛奶", ru: "молоко" }, { zh: "苹果", ru: "яблоко" },
+    { zh: "肉", ru: "мясо" }, { zh: "茶", ru: "чай" },
+    { zh: "咖啡", ru: "кофе" }, { zh: "米饭", ru: "рис" },
+    { zh: "汤", ru: "суп" }, { zh: "鸡蛋", ru: "яйцо" },
+    { zh: "蔬菜", ru: "овощ" }, { zh: "水果", ru: "фрукт" },
+    { zh: "糖", ru: "сахар" }, { zh: "盐", ru: "соль" },
+    { zh: "黄油", ru: "масло" }, { zh: "面包片", ru: "бутерброд" }
+  ],
+  "家庭": [
+    { zh: "妈妈", ru: "мама" }, { zh: "爸爸", ru: "папа" },
+    { zh: "儿子", ru: "сын" }, { zh: "女儿", ru: "дочь" },
+    { zh: "兄弟", ru: "брат" }, { zh: "姐妹", ru: "сестра" },
+    { zh: "爷爷", ru: "дедушка" }, { zh: "奶奶", ru: "бабушка" },
+    { zh: "丈夫", ru: "муж" }, { zh: "妻子", ru: "жена" },
+    { zh: "孩子", ru: "ребёнок" }, { zh: "父母", ru: "родители" },
+    { zh: "叔叔", ru: "дядя" }, { zh: "阿姨", ru: "тётя" },
+    { zh: "孙子", ru: "внук" }, { zh: "孙女", ru: "внучка" }
+  ],
+  "动词": [
+    { zh: "吃", ru: "есть" }, { zh: "喝", ru: "пить" },
+    { zh: "读", ru: "читать" }, { zh: "写", ru: "писать" },
+    { zh: "说", ru: "говорить" }, { zh: "走", ru: "идти" },
+    { zh: "看", ru: "смотреть" }, { zh: "听", ru: "слушать" },
+    { zh: "做", ru: "делать" }, { zh: "想", ru: "думать" },
+    { zh: "知道", ru: "знать" }, { zh: "爱", ru: "любить" },
+    { zh: "工作", ru: "работать" }, { zh: "学习", ru: "учиться" },
+    { zh: "睡觉", ru: "спать" }, { zh: "买", ru: "купить" }
+  ],
+  "颜色": [
+    { zh: "红色", ru: "красный" }, { zh: "蓝色", ru: "синий" },
+    { zh: "绿色", ru: "зелёный" }, { zh: "黑色", ru: "чёрный" },
+    { zh: "白色", ru: "белый" }, { zh: "黄色", ru: "жёлтый" },
+    { zh: "灰色", ru: "серый" }, { zh: "棕色", ru: "коричневый" },
+    { zh: "粉色", ru: "розовый" }, { zh: "橙色", ru: "оранжевый" },
+    { zh: "紫色", ru: "фиолетовый" }, { zh: "金色", ru: "золотой" }
+  ],
+  "数字": [
+    { zh: "一", ru: "один" }, { zh: "二", ru: "два" },
+    { zh: "三", ru: "три" }, { zh: "四", ru: "четыре" },
+    { zh: "五", ru: "пять" }, { zh: "六", ru: "шесть" },
+    { zh: "七", ru: "семь" }, { zh: "八", ru: "восемь" },
+    { zh: "九", ru: "девять" }, { zh: "十", ru: "десять" },
+    { zh: "百", ru: "сто" }, { zh: "千", ru: "тысяча" }
+  ]
+};
+
+/* ============================================================
+   数据层
+   ============================================================ */
+const LS_WORDS = "ru_words_v1";
+const LS_PROG  = "ru_prog_v1";
+
+let wordBank = {};
+let progress = {};
+
+function loadData() {
+  const w = localStorage.getItem(LS_WORDS);
+  if (w) {
+    wordBank = JSON.parse(w);
+  } else {
+    wordBank = JSON.parse(JSON.stringify(DEFAULT_WORDS));
+    saveWords();
+  }
+  const p = localStorage.getItem(LS_PROG);
+  progress = p ? JSON.parse(p) : {};
+}
+function saveWords() { localStorage.setItem(LS_WORDS, JSON.stringify(wordBank)); }
+function saveProg()  { localStorage.setItem(LS_PROG, JSON.stringify(progress)); }
+function keyOf(cat, ru) { return cat + "|" + ru; }
+function getProg(cat, ru) {
+  const k = keyOf(cat, ru);
+  if (!progress[k]) progress[k] = { seen: 0, ok: 0, bad: 0, next: 0 };
+  return progress[k];
+}
+
+/* ============================================================
+   状态
+   ============================================================ */
+let currentCat = null;
+let currentWord = null;
+let sessionOk = 0, sessionBad = 0;
+let pendingQueue = [];
+
+/* ============================================================
+   Tab 切换
+   ============================================================ */
+function switchTab(name) {
+  document.getElementById("studyView").classList.toggle("hidden", name !== "study");
+  document.getElementById("listView").classList.toggle("hidden", name !== "list");
+  document.getElementById("importView").classList.toggle("hidden", name !== "import");
+  document.getElementById("tabStudy").classList.toggle("active", name === "study");
+  document.getElementById("tabList").classList.toggle("active", name === "list");
+  document.getElementById("tabImport").classList.toggle("active", name === "import");
+  if (name === "list") renderList();
+  if (name === "import") renderCatManage();
+}
+
+/* ============================================================
+   分类渲染
+   ============================================================ */
+function renderCats() {
+  const el = document.getElementById("cats");
+  el.innerHTML = "";
+  Object.keys(wordBank).forEach(cat => {
+    const b = document.createElement("div");
+    b.className = "cat" + (cat === currentCat ? " active" : "");
+    b.innerHTML = cat + ' <span class="num">' + wordBank[cat].length + '</span>';
+    b.onclick = () => { currentCat = cat; renderCats(); nextWord(); updateBar(); };
+    el.appendChild(b);
+  });
+}
+
+/* ============================================================
+   取词逻辑
+   ============================================================ */
+function pickWord() {
+  const list = wordBank[currentCat];
+  if (!list || list.length === 0) return null;
+
+  if (pendingQueue.length > 0) {
+    const ru = pendingQueue.shift();
+    const w = list.find(x => x.ru === ru);
+    if (w) return w;
+  }
+
+  const now = Date.now();
+
+  const due = list.filter(w => {
+    const p = progress[keyOf(currentCat, w.ru)];
+    return p && p.next && p.next <= now;
+  });
+  if (due.length > 0) {
+    return due[Math.floor(Math.random() * due.length)];
+  }
+
+  const fresh = list.filter(w => !progress[keyOf(currentCat, w.ru)]);
+  if (fresh.length > 0) {
+    return fresh[Math.floor(Math.random() * fresh.length)];
+  }
+
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+function nextWord() {
+  currentWord = pickWord();
+  const promptEl = document.getElementById("prompt");
+  if (!currentWord) {
+    promptEl.textContent = "这个分类还没有单词";
+    document.getElementById("answer").textContent = "";
+    clearPad();
+    return;
+  }
+  promptEl.textContent = currentWord.zh;
+  document.getElementById("answer").textContent = "";
+  clearPad();
+  updateBar();
+}
+
+/* ============================================================
+   进度条
+   ============================================================ */
+function updateBar() {
+  const list = wordBank[currentCat] || [];
+  const total = list.length;
+  const learned = list.filter(w => progress[keyOf(currentCat, w.ru)]).length;
+  const pct = total ? Math.round(learned / total * 100) : 0;
+  document.getElementById("barFill").style.width = pct + "%";
+  document.getElementById("barText").textContent =
+    `已学 ${learned} / ${total}（${pct}%）`;
+}
+
+/* ============================================================
+   显示答案 / 朗读
+   ============================================================ */
+function showAnswer() {
+  if (!currentWord) return;
+  document.getElementById("answer").textContent = currentWord.ru;
+}
+
+function speakWord() {
+  if (!currentWord) return;
+  if (!("speechSynthesis" in window)) { toast("浏览器不支持朗读"); return; }
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(currentWord.ru);
+  u.lang = "ru-RU"; u.rate = 0.85;
+  const voices = speechSynthesis.getVoices();
+  const rv = voices.find(v => v.lang && v.lang.toLowerCase().startsWith("ru"));
+  if (rv) u.voice = rv;
+  speechSynthesis.speak(u);
+}
+
+/* ============================================================
+   两档反馈
+   ============================================================ */
+const DAY = 24 * 60 * 60 * 1000;
+
+function mark(ok) {
+  if (!currentWord) return;
+  const p = getProg(currentCat, currentWord.ru);
+  p.seen++;
+  if (ok) {
+    p.ok++;
+    sessionOk++;
+    const step = Math.min(p.ok, 5);
+    const gapDays = [1, 3, 7, 15, 30][step - 1] || 30;
+    p.next = Date.now() + gapDays * DAY;
+  } else {
+    p.bad++;
+    sessionBad++;
+    p.next = Date.now();
+    pendingQueue.push(currentWord.ru);
+  }
+  saveProg();
+  updateStats();
+  nextWord();
+}
+
+function updateStats() {
+  document.getElementById("stats").textContent =
+    `本次：认识 ${sessionOk} · 陌生 ${sessionBad}`;
+}
+
+/* ============================================================
+   词库总览
+   ============================================================ */
+let collapsedCats = {};   // 记录哪些分类被折叠了
+
+function renderList() {
+  let totalAll = 0;
+  Object.values(wordBank).forEach(a => totalAll += a.length);
+  let learnedAll = 0;
+  Object.entries(wordBank).forEach(([cat, list]) => {
+    list.forEach(w => { if (progress[keyOf(cat, w.ru)]) learnedAll++; });
+  });
+
+  document.getElementById("totalBox").innerHTML =
+    `共 <b>${totalAll}</b> 个单词，已学 <b>${learnedAll}</b> 个`;
+
+  const keyword = (document.getElementById("searchBox").value || "").trim().toLowerCase();
+  const wrap = document.getElementById("wordList");
+  wrap.innerHTML = "";
+
+  let matched = 0;   // 搜索命中的总数
+
+  Object.entries(wordBank).forEach(([cat, list]) => {
+    // 搜索过滤
+    const filtered = keyword
+      ? list.filter(w =>
+          w.zh.toLowerCase().includes(keyword) ||
+          w.ru.toLowerCase().includes(keyword))
+      : list;
+
+    if (keyword && filtered.length === 0) return;   // 搜不到就跳过这个分类
+
+    matched += filtered.length;
+
+    // 分类标题（可点击折叠）
+    const collapsed = !keyword && collapsedCats[cat];   // 搜索时强制展开
+    const t = document.createElement("div");
+    t.className = "cat-title";
+    t.style.cursor = "pointer";
+    t.style.display = "flex";
+    t.style.justifyContent = "space-between";
+    t.style.alignItems = "center";
+    t.innerHTML =
+      `<span>${collapsed ? "▶" : "▼"} ${cat}（${filtered.length}）</span>
+       <span style="font-size:12px;color:#999;font-weight:400">点击${collapsed ? "展开" : "折叠"}</span>`;
+    t.onclick = () => {
+      collapsedCats[cat] = !collapsedCats[cat];
+      renderList();
+    };
+    wrap.appendChild(t);
+
+    if (collapsed) return;   // 折叠时跳过内容
+
+    // 单词列表
+    filtered.forEach(w => {
+      const row = document.createElement("div");
+      row.className = "word-row";
+      row.innerHTML =
+        `<span class="word-zh">${w.zh}</span>
+         <span class="word-ru">${w.ru}</span>`;
+      wrap.appendChild(row);
+    });
+  });
+
+  // 搜索时显示命中数
+  if (keyword) {
+    const info = document.createElement("div");
+    info.style.cssText = "text-align:center;color:#888;font-size:13px;padding:10px 0";
+    info.textContent = `找到 ${matched} 个匹配的单词`;
+    wrap.insertBefore(info, wrap.firstChild);
+  }
+}
+
+/* ============================================================
+   导入功能
+   ============================================================ */
+function doImport() {
+  const cat = document.getElementById("importCat").value.trim();
+  const text = document.getElementById("importText").value.trim();
+  if (!cat) { toast("请填写分类名"); return; }
+  if (!text) { toast("请粘贴单词"); return; }
+
+  const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
+  const parsed = [];
+  lines.forEach(line => {
+    const parts = line.split(/[\s,，\t]+/).filter(Boolean);
+    if (parts.length >= 2) {
+      const zh = parts[0];
+      const ru = parts.slice(1).join(" ").trim();
+      parsed.push({ zh, ru });
+    }
+  });
+
+  if (parsed.length === 0) { toast("没解析出单词，检查格式"); return; }
+
+  if (!wordBank[cat]) wordBank[cat] = [];
+  let added = 0;
+  parsed.forEach(p => {
+    const exist = wordBank[cat].some(w => w.ru === p.ru);
+    if (!exist) { wordBank[cat].push(p); added++; }
+  });
+
+  saveWords();
+  renderCats();
+  renderCatManage();
+  document.getElementById("importText").value = "";
+  toast(`已导入 ${added} 个单词到「${cat}」`);
+}
+
+function loadExample() {
+  document.getElementById("importCat").value =
+    document.getElementById("importCat").value || "我的单词";
+  document.getElementById("importText").value =
+    "书 книга\n桌子 стол\n椅子 стул\n窗户 окно\n门 дверь";
+}
+
+function renderCatManage() {
+  const el = document.getElementById("catManageList");
+  el.innerHTML = "";
+  Object.entries(wordBank).forEach(([cat, list]) => {
+    const row = document.createElement("div");
+    row.className = "cat-list-item";
+    row.innerHTML = `<span>${cat} <span style="color:#888;font-size:13px">(${list.length})</span></span>`;
+    const btn = document.createElement("button");
+    btn.className = "del-btn";
+    btn.textContent = "删除";
+    btn.onclick = () => {
+      if (confirm(`确定删除分类「${cat}」及其 ${list.length} 个单词？`)) {
+        delete wordBank[cat];
+        Object.keys(progress).forEach(k => {
+          if (k.startsWith(cat + "|")) delete progress[k];
+        });
+        saveWords(); saveProg();
+        if (currentCat === cat) {
+          currentCat = Object.keys(wordBank)[0] || null;
+        }
+        renderCats(); renderCatManage();
+        if (currentCat) nextWord();
+        toast("已删除");
+      }
+    };
+    row.appendChild(btn);
+    el.appendChild(row);
+  });
+}
+
+/* ============================================================
+   导出 / 恢复备份
+      ============================================================ */
+function exportBackup() {
+  const data = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    words: wordBank,
+    progress: progress
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const d = new Date();
+  const stamp = d.getFullYear() + "-" +
+    String(d.getMonth() + 1).padStart(2, "0") + "-" +
+    String(d.getDate()).padStart(2, "0");
+  a.href = url;
+  a.download = `俄语单词备份-${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast("已导出备份");
+}
+
+function restoreBackup(evt) {
+  const file = evt.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    let data;
+    try {
+      data = JSON.parse(e.target.result);
+    } catch (err) {
+      toast("文件格式不对");
+      return;
+    }
+    if (!data || !data.words) { toast("不是有效的备份文件"); return; }
+
+    const mode = confirm(
+      "点【确定】= 覆盖（清空现有数据，完全用备份）\n" +
+      "点【取消】= 合并（保留现有，追加备份里的新词）"
+    );
+
+    if (mode) {
+      wordBank = data.words;
+      progress = data.progress || {};
+    } else {
+      Object.entries(data.words).forEach(([cat, list]) => {
+        if (!wordBank[cat]) wordBank[cat] = [];
+        list.forEach(w => {
+          if (!wordBank[cat].some(x => x.ru === w.ru)) {
+            wordBank[cat].push(w);
+          }
+        });
+      });
+      const bp = data.progress || {};
+      Object.entries(bp).forEach(([k, v]) => {
+        if (!progress[k]) {
+          progress[k] = v;
+        } else {
+          if ((v.seen || 0) > (progress[k].seen || 0)) progress[k] = v;
+        }
+      });
+    }
+
+    saveWords();
+    saveProg();
+    currentCat = Object.keys(wordBank)[0] || null;
+    renderCats();
+    renderCatManage();
+    nextWord();
+    updateBar();
+    updateStats();
+    toast(mode ? "已覆盖恢复" : "已合并恢复");
+  };
+  reader.readAsText(file);
+  evt.target.value = "";
+}
+
+/* ============================================================
+   提示条
+   ============================================================ */
+let toastTimer = null;
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 1800);
+}
+
+/* ============================================================
+   手写画布
+   ============================================================ */
+const canvas = document.getElementById("pad");
+const ctx = canvas.getContext("2d");
+let drawing = false;
+
+function resizeCanvas() {
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.scale(dpr, dpr);
+  ctx.lineWidth = 3;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = "#1f2937";
+}
+resizeCanvas();
+window.addEventListener("resize", () => { resizeCanvas(); clearPad(); });
+
+function pos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const p = e.touches ? e.touches[0] : e;
+  return { x: p.clientX - rect.left, y: p.clientY - rect.top };
+}
+function start(e) { e.preventDefault(); drawing = true; const {x,y}=pos(e); ctx.beginPath(); ctx.moveTo(x,y); }
+function move(e)  { if(!drawing) return; e.preventDefault(); const {x,y}=pos(e); ctx.lineTo(x,y); ctx.stroke(); }
+function end(e)   { if(!drawing) return; e.preventDefault(); drawing = false; }
+
+canvas.addEventListener("mousedown", start);
+canvas.addEventListener("mousemove", move);
+canvas.addEventListener("mouseup", end);
+canvas.addEventListener("mouseleave", end);
+canvas.addEventListener("touchstart", start, { passive: false });
+canvas.addEventListener("touchmove", move, { passive: false });
+canvas.addEventListener("touchend", end, { passive: false });
+
+function clearPad() {
+  const rect = canvas.getBoundingClientRect();
+  ctx.clearRect(0, 0, rect.width, rect.height);
+}
+
+/* ============================================================
+   初始化
+   ============================================================ */
+loadData();
+currentCat = Object.keys(wordBank)[0] || null;
+renderCats();
+renderCatManage();
+nextWord();
+updateStats();
+
+if ("speechSynthesis" in window) {
+  speechSynthesis.getVoices();
+  speechSynthesis.onvoiceschanged = () => {};
+}
+</script>
+
+</body>
+</html>
+    
